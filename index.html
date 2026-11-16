@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1c6aa5">
+    <title>Nivea Black &amp; White</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --blue: #00319f; --blue-dark: #00267d; --pink: #ed008c; --sky: #1c6aa5; --ink: #111; --muted: #6b7280; }
+        * { box-sizing: border-box; }
+        html, body { margin: 0; height: 100%; }
+        body {
+            overflow: hidden; background: var(--sky);
+            font-family: Montserrat, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        body.desktop { overflow: auto; }
+
+        /* Blurred copy of the banner fills whatever space the ad does not cover */
+        #backdrop {
+            position: fixed; inset: -60px; background: var(--sky) center / cover no-repeat;
+            filter: blur(32px) saturate(1.15);
+        }
+        #backdrop::after { content: ""; position: absolute; inset: 0; background: rgba(6, 22, 60, .2); }
+        .desktop #backdrop::after { background: linear-gradient(90deg, rgba(6, 22, 60, .1), rgba(6, 22, 60, .5)); }
+
+        #app { position: relative; min-height: 100%; display: flex; align-items: center; justify-content: center; }
+        .desktop #app { gap: 56px; padding: 32px 40px; }
+
+        #frame { position: relative; flex: none; overflow: hidden; }
+        .desktop #frame { border-radius: 14px; box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+
+        #stage { position: absolute; top: 0; left: 0; overflow: hidden; transform-origin: 0 0; user-select: none; -webkit-user-select: none; }
+        #bg-link { position: absolute; inset: 0; display: block; }
+        #bg { display: block; width: 100%; height: 100%; }
+
+        /* Pulsing "+" hotspots on each bottle (same behaviour as the reference ad) */
+        .spot {
+            position: absolute; z-index: 2; padding: 0; border: 0; background: none; cursor: pointer;
+            border-radius: 50%; opacity: 0; transform: translate(-50%, -50%) scale(.3);
+            filter: drop-shadow(0 2px 6px rgba(0, 0, 0, .35));
+            animation: spot-in .5s cubic-bezier(.2, .9, .3, 1.3) forwards;
+        }
+        .spot svg { display: block; width: 100%; height: 100%; animation: pulse .375s linear 1s 80 alternate; }
+        @keyframes spot-in { to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+        @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.1); } }
+
+        /* BUY NOW: a crop of the banner laid exactly over the printed button so it can pulse */
+        #cta {
+            position: absolute; z-index: 2; display: block; border-radius: 3px; background-repeat: no-repeat;
+            box-shadow: 0 0 15px rgba(0, 0, 0, .15); animation: pulse-cta .5s linear 1.2s 20 alternate;
+        }
+        @keyframes pulse-cta { from { transform: scale(1); } to { transform: scale(1.08); } }
+
+        .spot:focus-visible, #cta:focus-visible, .close:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+        .card:focus { outline: none; }
+        .card-link:focus-visible { outline: 3px solid var(--blue); outline-offset: -3px; border-radius: 14px; }
+
+        /* Product card */
+        #overlay {
+            position: absolute; inset: 0; z-index: 10; display: flex; align-items: center; justify-content: center;
+            padding: 18px 14px; background: rgba(6, 22, 60, .45);
+            opacity: 0; visibility: hidden; transition: opacity .25s, visibility 0s .25s;
+        }
+        #overlay.open { opacity: 1; visibility: visible; transition: opacity .25s; }
+        .card {
+            position: relative; width: 100%; background: #fff; border-radius: 14px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, .3);
+            transform: translateY(16px) scale(.96); transition: transform .3s cubic-bezier(.2, .9, .3, 1.2);
+        }
+        #overlay.open .card { transform: none; }
+        .close {
+            position: absolute; top: -10px; right: -10px; z-index: 1; width: 30px; height: 30px;
+            padding: 0; border: 0; background: none; cursor: pointer; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .3));
+        }
+        .close svg { display: block; width: 100%; height: 100%; }
+        .card-link { display: block; padding: 12px; color: inherit; text-decoration: none; }
+        .card-img { display: block; width: 100%; height: 150px; object-fit: contain; }
+        .card-info { margin-top: 8px; }
+        .card-brand { font-size: 11px; font-weight: 800; letter-spacing: .08em; color: var(--blue); }
+        .card-name { margin: 3px 0 2px; font-size: 14px; font-weight: 700; line-height: 1.25; color: var(--ink); }
+        .card-meta { font-size: 11px; font-weight: 500; color: var(--muted); }
+        .card-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 8px; margin-top: 6px; }
+        .price { font-size: 22px; font-weight: 800; color: var(--ink); }
+        .old { font-size: 12px; font-weight: 500; color: var(--muted); text-decoration: line-through; }
+        .off { padding: 2px 5px; border-radius: 4px; background: var(--pink); color: #fff; font-size: 11px; font-weight: 700; }
+        .card-btn {
+            display: flex; align-items: center; justify-content: center; gap: 6px; height: 44px; margin-top: 12px;
+            border-radius: 10px; background: var(--blue); color: #fff;
+            font-size: 14px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase;
+            transition: background-color .2s;
+        }
+        .card-btn svg { width: 16px; height: 16px; }
+
+        /* 300x250: side-by-side card so it fits the short slot */
+        .short #overlay { padding: 16px 18px; }
+        .short .card-link { padding: 10px; }
+        .short .card-top { position: relative; display: flex; align-items: center; gap: 10px; }
+        .short .off { position: absolute; top: 0; left: 0; }
+        .short .card-img { width: 88px; height: 88px; flex: none; }
+        .short .card-info { margin-top: 0; }
+        .short .card-name { font-size: 12px; }
+        .short .price { font-size: 17px; }
+        .short .card-btn { height: 34px; margin-top: 8px; font-size: 12px; }
+
+        /* Desktop only: shop panel beside the ad */
+        #shop { display: none; flex: none; width: 380px; color: #fff; }
+        .desktop #shop { display: block; }
+        .tags {
+            display: flex; flex-direction: column; align-items: flex-start; margin: 0 0 26px;
+            font-size: 21px; font-weight: 800; line-height: 1; letter-spacing: -.01em; text-transform: uppercase;
+            transform: rotate(-4deg); transform-origin: left bottom;
+        }
+        .tag { display: inline-flex; }
+        .tag > span { padding: 8px 10px; }
+        .tag-pink { background: var(--pink); color: #fff; }
+        .tag-dark { background: #000; color: #fff; }
+        .tag-with { background: #fff; color: #000; }
+        .lede { margin: 0 0 20px; font-size: 15px; font-weight: 500; line-height: 1.5; text-shadow: 0 1px 2px rgba(0, 0, 0, .25); }
+        .tile {
+            display: grid; grid-template-columns: 96px 1fr; column-gap: 14px; align-items: center;
+            margin-top: 14px; padding: 12px; border-radius: 14px; background: #fff; color: var(--ink); text-decoration: none;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, .25); transition: transform .2s, box-shadow .2s;
+        }
+        .tile:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(0, 0, 0, .3); }
+        .tile:hover .card-btn { background: var(--blue-dark); }
+        .tile:focus-visible { outline: 3px solid #fff; outline-offset: 3px; }
+        .tile img { width: 96px; height: 96px; object-fit: contain; }
+        .tile .price { font-size: 20px; }
+        .tile .card-btn { grid-column: 1 / -1; height: 40px; margin-top: 10px; font-size: 13px; }
+        .note { margin: 14px 0 0; font-size: 11px; opacity: .75; }
+
+        @media (prefers-reduced-motion: reduce) {
+            .spot { animation: none; opacity: 1; transform: translate(-50%, -50%); }
+            .spot svg, #cta { animation: none; }
+            #overlay, .card, .tile { transition: none; }
+        }
+    </style>
+</head>
+<body>
+    <div id="backdrop" aria-hidden="true"></div>
+
+    <main id="app">
+        <div id="frame">
+            <div id="stage">
+                <a id="bg-link" target="_blank" rel="noopener" aria-label="NIVEA Black &amp; White: Confidence on. Stain off. Buy on Jumia">
+                    <img id="bg" alt="" draggable="false">
+                </a>
+                <a id="cta" target="_blank" rel="noopener" aria-label="Buy now on Jumia"></a>
+
+                <div id="overlay" aria-hidden="true">
+                    <div class="card" id="card" role="dialog" aria-modal="true" aria-labelledby="card-name" tabindex="-1">
+                        <button class="close" type="button" aria-label="Close">
+                            <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="1" y="1" width="38" height="38" rx="8" fill="#fff"/><path d="M12 12l16 16M28 12L12 28" stroke="#111" stroke-width="3.2" stroke-linecap="round"/></svg>
+                        </button>
+                        <a class="card-link" id="card-link" target="_blank" rel="noopener">
+                            <div class="card-top">
+                                <img class="card-img" id="card-img" alt="" draggable="false">
+                                <div class="card-info">
+                                    <div class="card-brand" id="card-brand"></div>
+                                    <div class="card-name" id="card-name"></div>
+                                    <div class="card-meta" id="card-meta"></div>
+                                    <div class="card-price">
+                                        <span class="price" id="card-price"></span>
+                                        <span class="old" id="card-old"></span>
+                                        <span class="off" id="card-off"></span>
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="card-btn">Buy on Jumia
+                                <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                            </span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <aside id="shop" aria-label="Shop NIVEA Black &amp; White">
+            <h1 class="tags">
+                <span class="tag tag-pink"><span>Confidence on. Stain off.</span></span>
+                <span class="tag tag-dark"><span class="tag-with">With</span><span>Black &amp; White</span></span>
+            </h1>
+            <p class="lede">72hr sweat &amp; odour protection. Pick your roll-on and buy it on Jumia.</p>
+            <div id="tiles"></div>
+            <p class="note">Prices may change on Jumia.</p>
+        </aside>
+    </main>
+
+    <noscript>
+        <style>#app, #backdrop { display: none; } body { background: #fff; }</style>
+        <a href="https://www.jumia.com.ng/nivea-men-black-white-invisible-original-anti-perspirant-roll-on-for-men-72h-50ml-pack-of-3-104325951.html" target="_blank" rel="noopener"><img src="images/300x600.png" width="300" height="600" alt="NIVEA Black &amp; White: Confidence on. Stain off. Buy now on Jumia"></a>
+    </noscript>
+
+    <script>
+        (function () {
+            // Main click destination: the banner background and the BUY NOW button.
+            var MAIN_URL = 'https://www.jumia.com.ng/nivea-men-black-white-invisible-original-anti-perspirant-roll-on-for-men-72h-50ml-pack-of-3-104325951.html';
+
+            // One product per bottle in the banner. Prices are from Jumia on 16 Nov 2026: update them when Jumia changes them.
+            // Leave old/off empty ('') to hide the struck-through price and the discount badge.
+            var PRODUCTS = {
+                men: {
+                    brand: 'NIVEA MEN',
+                    name: 'Black & White Invisible Original Roll-⁠on 72h',
+                    meta: '50ml · Pack of 3',
+                    price: '₦4,000', old: '₦6,125', off: '-35%',
+                    img: 'images/products/men-original-3pack.jpg',
+                    url: MAIN_URL
+                },
+                women: {
+                    brand: 'NIVEA',
+                    name: 'Black & White Invisible Clear Roll-⁠on 72h',
+                    meta: '50ml · Pack of 3',
+                    price: '₦4,000', old: '₦6,125', off: '-35%',
+                    img: 'images/products/women-clear-3pack.jpg',
+                    url: 'https://www.jumia.com.ng/nivea-black-white-invisible-clear-anti-perspirant-roll-on-for-women-72h-50ml-pack-of-3-104325949.html'
+                }
+            };
+
+            // Positions in banner pixels for each size: hotspot centres [x, y], hotspot diameter, BUY NOW box [x1, y1, x2, y2].
+            var LAYOUTS = {
+                '300x600': { spots: { women: [80, 262], men: [217, 248] }, spot: 40, cta: [161, 550, 293, 580] },
+                '320x480': { spots: { women: [102, 188], men: [229, 172] }, spot: 36, cta: [196, 435, 311, 461] },
+                '300x250': { spots: { women: [189, 89], men: [253, 80] }, spot: 26, cta: [211, 224, 285, 241] }
+            };
+
+            // Screen layout. Desktop = wide enough for the shop panel beside the ad.
+            var DESKTOP = window.matchMedia('(min-width: 900px) and (min-height: 540px)');
+            var SHOP_W = 380, GAP = 56, PAD_X = 40, PAD_Y = 32;
+            var MAX_SCALE = 1.6; // the banner art is 300px wide, so don't blow it up further than this
+
+            var PLUS_SVG = '<svg viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="19" fill="#fff" stroke="#000" stroke-width="2"/><path d="M20 11v18M11 20h18" stroke="#000" stroke-width="2.4" stroke-linecap="round"/></svg>';
+            var ARROW_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h9M8.5 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+            var params = new URLSearchParams(location.search);
+            var forcedSize = LAYOUTS[params.get('size')] ? params.get('size') : null;
+
+            // Optional ad-server click tracking, e.g. ?click=${CLICK_URL}
+            var macro = params.get('click');
+            function clickUrl(url) { return macro ? macro + encodeURIComponent(url) : url; }
+
+            var $ = function (id) { return document.getElementById(id); };
+            var stage = $('stage'), frame = $('frame'), overlay = $('overlay');
+            var currentSize = null, lastSpot = null;
+
+            function dims(size) { var d = size.split('x'); return [+d[0], +d[1]]; }
+
+            function el(tag, cls, text) {
+                var n = document.createElement(tag);
+                if (cls) n.className = cls;
+                if (text) n.textContent = text;
+                return n;
+            }
+
+            // Without ?size, use the banner whose shape is closest to the screen (tall phone, tablet, landscape).
+            function pickSize(desktop) {
+                if (forcedSize) return forcedSize;
+                if (desktop) return '300x600';
+                var ratio = window.innerWidth / window.innerHeight, best = null, bestDiff = Infinity;
+                Object.keys(LAYOUTS).forEach(function (size) {
+                    var d = dims(size), diff = Math.abs(Math.log(d[0] / d[1] / ratio));
+                    if (diff < bestDiff) { bestDiff = diff; best = size; }
+                });
+                return best;
+            }
+
+            function render(size) {
+                var d = dims(size), W = d[0], H = d[1], layout = LAYOUTS[size];
+                var banner = 'images/' + size + '.png';
+
+                stage.style.width = W + 'px';
+                stage.style.height = H + 'px';
+                stage.classList.toggle('short', H < 300);
+
+                $('bg').src = banner;
+                $('bg').width = W;
+                $('bg').height = H;
+                $('bg-link').href = clickUrl(MAIN_URL);
+                $('backdrop').style.backgroundImage = 'url(' + banner + ')';
+
+                var c = layout.cta, cta = $('cta');
+                cta.href = clickUrl(MAIN_URL);
+                cta.style.left = c[0] + 'px';
+                cta.style.top = c[1] + 'px';
+                cta.style.width = (c[2] - c[0]) + 'px';
+                cta.style.height = (c[3] - c[1]) + 'px';
+                cta.style.backgroundImage = 'url(' + banner + ')';
+                cta.style.backgroundSize = W + 'px ' + H + 'px';
+                cta.style.backgroundPosition = (-c[0]) + 'px ' + (-c[1]) + 'px';
+
+                Array.prototype.forEach.call(stage.querySelectorAll('.spot'), function (n) { n.remove(); });
+                Object.keys(layout.spots).forEach(function (key, i) {
+                    var p = PRODUCTS[key], xy = layout.spots[key];
+                    var b = el('button', 'spot');
+                    b.type = 'button';
+                    b.style.left = xy[0] + 'px';
+                    b.style.top = xy[1] + 'px';
+                    b.style.width = b.style.height = layout.spot + 'px';
+                    b.style.animationDelay = (0.3 + i * 0.15) + 's';
+                    b.setAttribute('aria-label', 'View ' + p.brand + ' ' + p.name);
+                    b.innerHTML = PLUS_SVG;
+                    b.addEventListener('click', function () { openCard(key, b); });
+                    stage.insertBefore(b, overlay);
+                });
+            }
+
+            function fit() {
+                var desktop = DESKTOP.matches;
+                document.body.classList.toggle('desktop', desktop);
+
+                var size = pickSize(desktop);
+                if (size !== currentSize) {
+                    closeCard();
+                    lastSpot = null;
+                    render(size);
+                    currentSize = size;
+                }
+
+                var d = dims(size);
+                var availW = desktop ? window.innerWidth - SHOP_W - GAP - 2 * PAD_X : window.innerWidth;
+                var availH = desktop ? window.innerHeight - 2 * PAD_Y : window.innerHeight;
+                var s = Math.min(availW / d[0], availH / d[1], MAX_SCALE);
+                frame.style.width = d[0] * s + 'px';
+                frame.style.height = d[1] * s + 'px';
+                stage.style.transform = s === 1 ? '' : 'scale(' + s + ')';
+            }
+
+            function fillPrice(row, p) {
+                row.appendChild(el('span', 'price', p.price));
+                if (p.old) row.appendChild(el('span', 'old', p.old));
+                if (p.off) row.appendChild(el('span', 'off', p.off));
+            }
+
+            // Desktop shop panel: one tile per product, built from PRODUCTS.
+            Object.keys(PRODUCTS).forEach(function (key) {
+                var p = PRODUCTS[key];
+                var a = el('a', 'tile');
+                a.href = clickUrl(p.url);
+                a.target = '_blank';
+                a.rel = 'noopener';
+                var img = el('img');
+                img.src = p.img;
+                img.alt = p.brand + ' ' + p.name;
+                img.loading = 'lazy';
+                var info = el('div');
+                info.appendChild(el('div', 'card-brand', p.brand));
+                info.appendChild(el('div', 'card-name', p.name));
+                info.appendChild(el('div', 'card-meta', p.meta));
+                var row = el('div', 'card-price');
+                fillPrice(row, p);
+                info.appendChild(row);
+                var btn = el('span', 'card-btn', 'Buy on Jumia');
+                btn.insertAdjacentHTML('beforeend', ARROW_SVG);
+                a.appendChild(img);
+                a.appendChild(info);
+                a.appendChild(btn);
+                $('tiles').appendChild(a);
+            });
+
+            function openCard(key, from) {
+                var p = PRODUCTS[key];
+                $('card-link').href = clickUrl(p.url);
+                $('card-img').src = p.img;
+                $('card-img').alt = p.brand + ' ' + p.name;
+                $('card-brand').textContent = p.brand;
+                $('card-name').textContent = p.name;
+                $('card-meta').textContent = p.meta;
+                $('card-price').textContent = p.price;
+                $('card-old').textContent = p.old;
+                $('card-old').hidden = !p.old;
+                $('card-off').textContent = p.off;
+                $('card-off').hidden = !p.off;
+                lastSpot = from;
+                overlay.classList.add('open');
+                overlay.removeAttribute('aria-hidden');
+                $('card').focus({ preventScroll: true });
+            }
+
+            function closeCard() {
+                if (!overlay.classList.contains('open')) return;
+                overlay.classList.remove('open');
+                overlay.setAttribute('aria-hidden', 'true');
+                if (lastSpot && lastSpot.isConnected) lastSpot.focus({ preventScroll: true });
+            }
+
+            overlay.querySelector('.close').addEventListener('click', closeCard);
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) closeCard(); });
+            document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeCard(); });
+            // Reset the card once the shopper has gone to Jumia, so the ad is clean when they come back.
+            $('card-link').addEventListener('click', function () { setTimeout(closeCard, 300); });
+
+            fit();
+            window.addEventListener('resize', fit);
+        })();
+    </script>
+</body>
+</html>
